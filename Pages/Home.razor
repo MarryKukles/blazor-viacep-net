@@ -1,0 +1,133 @@
+﻿
+@page "/"
+@using BlazorViaCep.Models
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Consulta de CEP</PageTitle>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h1 class="h3 mb-2">Consulta de CEP</h1>
+                    <p class="text-muted">
+                        Digite um CEP para consultar o endereço.
+                    </p>
+
+                    <form @onsubmit="ConsultarCep" @onsubmit:preventDefault>
+                        <label for="cep" class="form-label">
+                            CEP
+                        </label>
+
+                        <div class="input-group mb-3">
+                            <input id="cep"
+                                   class="form-control"
+                                   placeholder="Ex.: 01001-000"
+                                   maxlength="9"
+                                   @bind="Cep"
+                                   @bind:event="oninput" />
+
+                            <button class="btn btn-primary"
+                                    type="submit"
+                                    disabled="@Carregando">
+                                @(Carregando ? "Consultando..." : "Consultar")
+                            </button>
+                        </div>
+                    </form>
+
+                    @if (!string.IsNullOrWhiteSpace(Mensagem))
+                    {
+                        <div class="alert @(Sucesso ? "alert-success" : "alert-warning")"
+                             role="status">
+                            @Mensagem
+                        </div>
+                    }
+
+                    @if (EnderecoEncontrado is not null)
+                    {
+                        <hr />
+                        <h2 class="h5 mb-3">Endereço encontrado</h2>
+
+                        <div class="mb-2">
+                            <strong>CEP:</strong> @EnderecoEncontrado.Cep
+                        </div>
+                        <div class="mb-2">
+                            <strong>Logradouro:</strong> @EnderecoEncontrado.Logradouro
+                        </div>
+                        <div class="mb-2">
+                            <strong>Complemento:</strong> @EnderecoEncontrado.Complemento
+                        </div>
+                        <div class="mb-2">
+                            <strong>Bairro:</strong> @EnderecoEncontrado.Bairro
+                        </div>
+                        <div class="mb-2">
+                            <strong>Cidade:</strong> @EnderecoEncontrado.Localidade
+                        </div>
+                        <div class="mb-2">
+                            <strong>Estado:</strong> @EnderecoEncontrado.Uf
+                        </div>
+                        <div class="mb-2">
+                            <strong>DDD:</strong> @EnderecoEncontrado.Ddd
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string Cep = string.Empty;
+    private Endereco? EnderecoEncontrado;
+    private string Mensagem = string.Empty;
+    private bool Carregando;
+    private bool Sucesso;
+
+    private async Task ConsultarCep()
+    {
+        EnderecoEncontrado = null;
+        Mensagem = string.Empty;
+        Sucesso = false;
+
+        var cepLimpo = new string(
+            Cep.Where(char.IsDigit).ToArray());
+
+        if (cepLimpo.Length != 8)
+        {
+            Mensagem = "Digite um CEP válido com 8 números.";
+            return;
+        }
+
+        try
+        {
+            Carregando = true;
+
+            var resultado = await Http.GetFromJsonAsync<Endereco>(
+                $"https://viacep.com.br/ws/{cepLimpo}/json/");
+
+            if (resultado is null || resultado.Erro)
+            {
+                Mensagem = "CEP não encontrado. Confira os números.";
+                return;
+            }
+
+            EnderecoEncontrado = resultado;
+            Mensagem = "Endereço consultado com sucesso!";
+            Sucesso = true;
+        }
+        catch (HttpRequestException)
+        {
+            Mensagem = "Não foi possível acessar a API. Verifique sua conexão.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            Mensagem = "A resposta da API não pôde ser interpretada.";
+        }
+        finally
+        {
+            Carregando = false;
+        }
+    }
+}
